@@ -40,7 +40,9 @@ def search(v_keyword):
     result_list = soup.select('.List > dive > dive')
     print(soup)
 
+#Test Git
 def test():
+
     print("开始搜索")
     wait_second = random.randint(1, 3)
     sleep(wait_second)
