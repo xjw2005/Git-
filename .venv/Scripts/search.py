@@ -40,7 +40,7 @@ def search(v_keyword):
     result_list = soup.select('.List > dive > dive')
     print(soup)
 
-#Test Git!
+#Test Git
 def test():
 
     print("开始搜索")
