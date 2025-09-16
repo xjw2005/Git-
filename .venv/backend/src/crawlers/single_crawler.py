@@ -1,4 +1,7 @@
 import time
+from selenium.common import NoSuchElementException
+from anyio import sleep
+from .Doubao_Crawler import doubao_crawler
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -20,12 +23,22 @@ def is_program_running_windows(program_name):
     return program_name.lower() in output.lower()
 
 
-def bilibili_crawler(query: str="AX210网卡怎么样") -> List[Dict]:
+#数据
+
+def single_crawler(query: str="AX210网卡怎么样") -> List[Dict]:
     """B站专栏搜索爬虫（同步版，需在异步环境中用线程池调用）"""
     options = Options()
     options.add_experimental_option("debuggerAddress", "localhost:9222")
-    options.add_argument("--headless")  # 启用无头模式
-    options.add_argument("--disable-gpu")  # 禁用 GPU 加速
+
+
+    # chrome_process = subprocess.Popen([
+    #     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    #     "--remote-debugging-port=9222",
+    #     "--user-data-dir=C:\\selenium\\ChromeProfile",
+    #     "--headless=new",
+    #     "--disable-gpu"
+    # ])
+    #
 
     chrome_process = subprocess.Popen([
         "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
@@ -59,7 +72,6 @@ def bilibili_crawler(query: str="AX210网卡怎么样") -> List[Dict]:
 
         driver.implicitly_wait(3)
 
-        time.sleep(1)
         for i in range(1, 6):
             try:
                 title = driver.find_element(By.XPATH, '//*[@id="i_cecream"]/div/div[2]/div[2]/div/div/div[2]/div[1]/div[{num}]/div/div[2]/h2/a'.format(num=i))
@@ -71,16 +83,60 @@ def bilibili_crawler(query: str="AX210网卡怎么样") -> List[Dict]:
                 message = driver.find_element(By.XPATH, '//*[@id="i_cecream"]/div/div[2]/div[2]/div/div/div[2]/div[1]/div[{num}]/div/div[2]/p[2]'.format(num=i))
                 #//*[@id="content"]
 
-                data = {"标题": title,
-                        "介绍：": message.text,
-                        "链接": link,
+                data = {"标题:": title,
+                        "介绍:": message.text,
+                        "链接:": link,
                         "relevance": 0.8
                         }
                 result_list.append(data)
             except Exception as e:
-                print(f"抓去第{i}条失败：{str(e)}")
+                print(f"抓去第{i}条失败")
+
+        print("开始抓取知乎数据")
+        try:
+            time.sleep(1)
+            driver.switch_to.window(driver.window_handles[0])
+            driver.get("http://www.zhihu.com")
+            # time.sleep(15)
+            search_box = driver.find_element(By.XPATH, '//*[@id="Popover1-toggle"]')
+
+            # 搜索框中输入
+            search_box.send_keys(f"{query}")
+            time.sleep(0.8)
+            # 模拟按下回车键
+            search_box.send_keys(Keys.ENTER)
+
+            # 开始获取前面几页的资料：和链接
+
+            driver.implicitly_wait(3)
+
+            for i in range(1, 8):  # #//*[@id="SearchMain"]/div/div/div/div[3]/div/div/div/h2/span/div/div/a/span
+                try:
+                    parent = driver.find_element(By.XPATH, '//*[@id="SearchMain"]/div/div/div/div[{num}]'.format(num=i))
+                    title = parent.find_element(By.CSS_SELECTOR, 'span.Highlight')
+                    message = parent.find_element(By.CSS_SELECTOR, '#content')
+                    href = parent.find_element(By.CSS_SELECTOR, 'a')
+                    href = href.get_attribute('href')
+                    data = {"标题:": title.text,
+                            "介绍:": message.text,
+                            "链接:": href,
+                            "relevance": 0.8
+                            }
+                    result_list.append(data)
+                except NoSuchElementException as e:
+                    # print("jump and continue !")
+                    # print(e)
+                    continue
+        except Exception as e:
+            print(f"错误：{e}")
+            print("知乎数据抓取失败！")
+        print("开始抓取豆包：")
+        result = doubao_crawler(query, driver)
+        print("豆包数据抓取完毕！")
+        result_list.append(result)
 
     finally:
+        # 进程清理逻辑
         parent = psutil.Process(chrome_process.pid)
         for child in parent.children(recursive=True):
             child.kill()
@@ -89,11 +145,11 @@ def bilibili_crawler(query: str="AX210网卡怎么样") -> List[Dict]:
 
     return result_list
 
+
 if __name__ == '__main__':
 
 
-    result_list = bilibili_crawler()
+    result_list = single_crawler("辛弃疾")
     pprint.pprint(result_list)
-
 
 #Test

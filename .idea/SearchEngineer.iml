@@ -2,6 +2,11 @@
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/.venv/Scripts/code" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/.venv/backend/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/.venv/backend/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/.venv/frontend/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/.venv/frontend/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.10 (SearchEngineer)" jdkType="Python SDK" />

@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>多平台爬虫数据展示系统</title>
+  <!-- 引入Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入Font Awesome图标 -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <!-- 配置Tailwind主题 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#4F46E5',
+            secondary: '#10B981',
+            neutral: '#64748B',
+            dark: '#1E293B',
+          },
+          fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+
+  <!-- 自定义工具类 -->
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .card-shadow {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      }
+      .search-shadow {
+        box-shadow: 0 4px 20px rgba(79, 70, 229, 0.15);
+      }
+    }
+  </style>
+</head>
+<body class="font-inter bg-gray-50 text-dark min-h-screen flex flex-col">
+  <!-- 顶部导航栏 -->
+  <header class="bg-white shadow-sm sticky top-0 z-50">
+    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <i class="fa fa-database text-primary text-2xl"></i>
+        <h1 class="text-xl md:text-2xl font-bold text-primary">爬虫数据中心</h1>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span class="hidden md:inline-block text-neutral text-sm">支持B站/知乎/豆包数据爬取</span>
+        <button id="themeToggle" class="p-2 rounded-full hover:bg-gray-100 transition-colors">
+          <i class="fa fa-moon-o text-neutral"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="flex-grow container mx-auto px-4 py-8">
+    <!-- 搜索区域 -->
+    <section class="max-w-3xl mx-auto mb-12">
+      <div class="bg-white rounded-xl p-6 search-shadow">
+        <h2 class="text-xl font-semibold mb-4 text-center">多平台数据爬取工具</h2>
+        <p class="text-neutral text-sm mb-6 text-center">输入关键词，获取B站专栏、知乎问答及豆包相关数据</p>
+
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input
+            type="text"
+            id="searchQuery"
+            placeholder="请输入搜索关键词（例如：辛弃疾）"
+            class="flex-grow px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+          >
+          <button
+            id="startCrawl"
+            class="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <i class="fa fa-search"></i>
+            <span>开始爬取</span>
+          </button>
+        </div>
+
+        <!-- 加载状态 -->
+        <div id="loadingState" class="hidden mt-4 flex items-center justify-center text-neutral">
+          <i class="fa fa-circle-o-notch fa-spin mr-2"></i>
+          <span>正在爬取数据，请稍候...</span>
+        </div>
+
+        <!-- 爬取结果统计 -->
+        <div id="resultStats" class="hidden mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-4 justify-center">
+          <div class="flex items-center gap-1 text-sm">
+            <i class="fa fa-file-text-o text-primary"></i>
+            <span id="totalCount" class="font-medium">0</span>
+            <span>条数据</span>
+          </div>
+          <div class="flex items-center gap-1 text-sm">
+            <i class="fa fa-clock-o text-neutral"></i>
+            <span id="timeCost" class="font-medium">0</span>
+            <span>秒</span>
+          </div>
+          <div class="flex items-center gap-1 text-sm">
+            <i class="fa fa-plug text-secondary"></i>
+            <span id="platforms" class="font-medium">3</span>
+            <span>个平台</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 数据展示区域 -->
+    <section id="dataDisplay" class="hidden">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-semibold flex items-center gap-2">
+          <i class="fa fa-table text-primary"></i>
+          <span>爬取结果展示</span>
+        </h2>
+        <div class="flex gap-2">
+          <button id="exportJson" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm flex items-center gap-1 transition-colors">
+            <i class="fa fa-download"></i>
+            <span>导出JSON</span>
+          </button>
+          <button id="clearData" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm flex items-center gap-1 transition-colors">
+            <i class="fa fa-trash"></i>
+            <span>清空数据</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 数据标签页 -->
+      <div class="border-b border-gray-200 mb-6">
+        <div class="flex flex-wrap -mb-px">
+          <button class="tab-btn active px-4 py-2 text-primary border-b-2 border-primary font-medium" data-tab="all">
+            全部数据 <span id="allCount" class="ml-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">0</span>
+          </button>
+          <button class="tab-btn px-4 py-2 text-neutral border-b-2 border-transparent hover:text-primary hover:border-primary/30 font-medium" data-tab="bilibili">
+            B站专栏 <span id="bilibiliCount" class="ml-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">0</span>
+          </button>
+          <button class="tab-btn px-4 py-2 text-neutral border-b-2 border-transparent hover:text-primary hover:border-primary/30 font-medium" data-tab="zhihu">
+            知乎问答 <span id="zhihuCount" class="ml-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">0</span>
+          </button>
+          <button class="tab-btn px-4 py-2 text-neutral border-b-2 border-transparent hover:text-primary hover:border-primary/30 font-medium" data-tab="doubao">
+            豆包数据 <span id="doubaoCount" class="ml-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 数据列表 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div id="dataGrid" class="col-span-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- 数据卡片将通过JS动态生成 -->
+        </div>
+
+        <!-- 空数据状态 -->
+        <div id="emptyState" class="col-span-full flex flex-col items-center justify-center py-16 text-center">
+          <div class="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <i class="fa fa-folder-open-o text-4xl text-neutral"></i>
+          </div>
+          <h3 class="text-lg font-medium mb-2">暂无数据</h3>
+          <p class="text-neutral text-sm max-w-md">请输入关键词并点击"开始爬取"按钮获取数据</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 详情弹窗 -->
+  <div id="detailModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl max-w-3xl w-full max-h-[80vh] overflow-auto m-4">
+      <div class="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+        <h3 id="modalTitle" class="text-xl font-semibold"></h3>
+        <button id="closeModal" class="text-neutral hover:text-dark transition-colors">
+          <i class="fa fa-times text-xl"></i>
+        </button>
+      </div>
+      <div class="p-6">
+        <div class="mb-4">
+          <span id="modalSource" class="inline-block px-3 py-1 bg-primary/10 text-primary text-xs rounded-full"></span>
+          <span id="modalRelevance" class="inline-block ml-2 px-3 py-1 bg-gray-100 text-neutral text-xs rounded-full"></span>
+        </div>
+        <div id="modalContent" class="prose max-w-none text-gray-700">
+          <!-- 详情内容将通过JS动态生成 -->
+        </div>
+        <div class="mt-6 pt-4 border-t border-gray-100">
+          <a id="modalLink" href="#" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline">
+            <span>查看原文</span>
+            <i class="fa fa-external-link"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <footer class="bg-white border-t border-gray-200 py-6">
+    <div class="container mx-auto px-4 text-center text-neutral text-sm">
+      <p>© 2024 爬虫数据展示系统 | 仅供学习使用</p>
+      <p class="mt-1">数据来源于公开网络，请勿用于商业用途</p>
+    </div>
+  </footer>
+  <script>
+    // 全局变量
+let crawlData = [];
+let isCrawling = false;
+
+// DOM元素
+const searchQuery = document.getElementById('searchQuery');
+const startCrawl = document.getElementById('startCrawl');
+const loadingState = document.getElementById('loadingState');
+const resultStats = document.getElementById('resultStats');
+const dataDisplay = document.getElementById('dataDisplay');
+const dataGrid = document.getElementById('dataGrid');
+const emptyState = document.getElementById('emptyState');
+const detailModal = document.getElementById('detailModal');
+const closeModal = document.getElementById('closeModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalSource = document.getElementById('modalSource');
+const modalRelevance = document.getElementById('modalRelevance');
+const modalContent = document.getElementById('modalContent');
+const modalLink = document.getElementById('modalLink');
+const exportJson = document.getElementById('exportJson');
+const clearData = document.getElementById('clearData');
+const tabBtns = document.querySelectorAll('.tab-btn');
+const totalCount = document.getElementById('totalCount');
+const timeCost = document.getElementById('timeCost');
+const allCount = document.getElementById('allCount');
+const bilibiliCount = document.getElementById('bilibiliCount');
+const zhihuCount = document.getElementById('zhihuCount');
+const doubaoCount = document.getElementById('doubaoCount');
+const themeToggle = document.getElementById('themeToggle');
+
+// 初始化
+document.addEventListener('DOMContentLoaded', () => {
+  // 绑定事件
+  startCrawl.addEventListener('click', handleCrawl);
+  closeModal.addEventListener('click', closeDetailModal);
+  exportJson.addEventListener('click', exportDataAsJson);
+  clearData.addEventListener('click', clearAllData);
+  themeToggle.addEventListener('click', toggleTheme);
+  tabBtns.forEach(btn => btn.addEventListener('click', switchTab));
+
+  // 点击模态框外部关闭
+  detailModal.addEventListener('click', (e) => {
+    if (e.target === detailModal) closeDetailModal();
+  });
+
+  // 键盘ESC关闭模态框
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDetailModal();
+  });
+});
+
+// 处理爬取逻辑
+async function handleCrawl() {
+  const query = searchQuery.value.trim();
+  if (!query) {
+    alert('请输入搜索关键词');
+    return;
+  }
+
+  if (isCrawling) return;
+
+  // 状态更新
+  isCrawling = true;
+  startCrawl.disabled = true;
+  loadingState.classList.remove('hidden');
+  resultStats.classList.add('hidden');
+  dataDisplay.classList.add('hidden');
+
+  try {
+    // 模拟爬取延迟（实际项目中替换为真实API请求）
+    const startTime = Date.now();
+
+    // 这里模拟后端返回的数据格式，实际项目中应替换为：
+    const response = await fetch('/api/crawl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    crawlData = await response.json();
+
+    // 模拟数据（根据你的Python爬虫返回格式生成）
+    // crawlData = generateMockData(query);
+
+    const endTime = Date.now();
+    const costTime = ((endTime - startTime) / 1000).toFixed(1);
+
+    // 更新统计信息
+    timeCost.textContent = costTime;
+    updateCountStats();
+
+    // 显示数据
+    renderData('all');
+    dataDisplay.classList.remove('hidden');
+    resultStats.classList.remove('hidden');
+
+    // 如果有数据则隐藏空状态
+    if (crawlData.length > 0) {
+      emptyState.classList.add('hidden');
+    } else {
+      emptyState.classList.remove('hidden');
+    }
+
+  } catch (error) {
+    console.error('爬取失败:', error);
+    alert('爬取数据失败，请稍后重试');
+  } finally {
+    // 恢复状态
+    isCrawling = false;
+    startCrawl.disabled = false;
+    loadingState.classList.add('hidden');
+  }
+}
+
+// 生成模拟数据（模拟Python爬虫返回的list格式）
+function generateMockData(query) {
+  // 模拟B站数据
+  const bilibiliData = [
+    {
+      "标题": `${query} 生平事迹详解`,
+      "介绍：": `本文详细介绍了${query}的生平经历、主要成就和历史影响，结合史料记载还原真实的${query}形象。`,
+      "链接": "https://www.bilibili.com/read/cv1234567",
+      "relevance": 0.92,
+      "platform": "bilibili"
+    },
+    {
+      "标题": `${query} 经典作品赏析`,
+      "介绍：": `深入解析${query}的代表作品，从创作背景到艺术特色，带你领略宋词大师的文学魅力。`,
+      "链接": "https://www.bilibili.com/read/cv1234568",
+      "relevance": 0.88,
+      "platform": "bilibili"
+    },
+    {
+      "标题": `${query} 历史地位评价`,
+      "介绍：": `从历史角度客观评价${query}的贡献，分析其在文学和政治领域的双重影响。`,
+      "链接": "https://www.bilibili.com/read/cv1234569",
+      "relevance": 0.85,
+      "platform": "bilibili"
+    }
+  ];
+
+  // 模拟知乎数据
+  const zhihuData = [
+    {
+      "标题": `如何评价${query}的文学成就？`,
+      "介绍：": `知乎高赞回答汇总：${query}的词作风格为何被称为"豪放派巅峰"？其作品如何体现时代背景？`,
+      "链接": "https://www.zhihu.com/question/12345678",
+      "relevance": 0.90,
+      "platform": "zhihu"
+    },
+    {
+      "标题": `${query}的军事才能被低估了吗？`,
+      "介绍：": `结合史料分析${query}在抗金战争中的具体贡献，解读其"文武双全"的历史形象。`,
+      "链接": "https://www.zhihu.com/question/12345679",
+      "relevance": 0.86,
+      "platform": "zhihu"
+    },
+    {
+      "标题": `${query}最经典的10首词及其解读`,
+      "介绍：": `精选${query}流传最广的词作，逐首解析意象与情感，附创作背景考证。`,
+      "链接": "https://www.zhihu.com/question/12345680",
+      "relevance": 0.83,
+      "platform": "zhihu"
+    }
+  ];
+
+  // 模拟豆包数据
+  const doubaoData = [
+    {
+      "标题": `${query}核心信息汇总`,
+      "介绍：": `豆包AI整理：${query}生平、代表作、历史评价等核心信息，结构化呈现关键知识点。`,
+      "链接": "https://www.doubao.com/info/123456",
+      "relevance": 0.95,
+      "platform": "doubao"
+    },
+    {
+      "标题": `${query}与苏轼的豪放词风对比`,
+      "介绍：": `从题材、手法、情感内核三方面对比两大豪放派词人，分析风格差异的成因。`,
+      "链接": "https://www.doubao.com/info/123457",
+      "relevance": 0.89,
+      "platform": "doubao"
+    }
+  ];
+
+  // 合并所有数据并返回
+  return [...bilibiliData, ...zhihuData, ...doubaoData];
+}
+
+// 渲染数据卡片
+function renderData(tabType) {
+  dataGrid.innerHTML = ''; // 清空现有数据
+
+  // 筛选对应标签页的数据
+  let filteredData = [];
+  if (tabType === 'all') {
+    filteredData = crawlData;
+  } else {
+    filteredData = crawlData.filter(item => item.platform === tabType);
+  }
+
+  // 生成数据卡片
+  filteredData.forEach(item => {
+    console.log('当前item对象:', item); // 查看item是否存在及结构
+    const card = document.createElement('div');
+    card.className = 'bg-white rounded-xl p-5 card-shadow hover:shadow-lg transition-shadow cursor-pointer';
+    card.dataset.item = JSON.stringify(item); // 存储完整数据用于弹窗
+
+    // 平台图标映射
+    const platformIcon = {
+      bilibili: '<i class="fa fa-play-circle text-pink-500"></i>',
+      zhihu: '<i class="fa fa-comment-o text-blue-500"></i>',
+      doubao: '<i class="fa fa-robot text-purple-500"></i>'
+    };
+
+    // 平台名称映射
+    const platformName = {
+      bilibili: 'B站专栏',
+      zhihu: '知乎问答',
+      doubao: '豆包数据'
+    };
+
+
+   card.innerHTML = `
+    <div class="flex justify-between items-start mb-3">
+      <span class="text-xs px-2 py-1 bg-gray-100 rounded-full flex items-center gap-1">
+        ${platformIcon[item.platform]}
+        ${platformName[item.platform]}
+      </span>
+      <span class="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+        相关性 ${item["relevance"] ? item["relevance"].toFixed(2) : '0.00'}
+      </span>
+    </div>
+    <h3 class="font-semibold text-lg mb-2 line-clamp-2">${item["标题:"] || '无标题'}</h3>
+    <p class="text-neutral text-sm mb-4 line-clamp-3">${item['介绍:'] || '无介绍内容'}</p>
+    <a href="${item['链接:']}" target="_blank" class="text-primary text-sm hover:underline">查看原文 →</a>
+  `;
+
+
+    // 点击卡片打开详情弹窗
+    card.addEventListener('click', (e) => {
+      if (!e.target.closest('a')) { // 点击链接时不触发弹窗
+        openDetailModal(JSON.parse(card.dataset.item));
+      }
+    });
+
+    dataGrid.appendChild(card);
+  });
+}
+
+// 切换标签页
+function switchTab(e) {
+  const tabType = e.target.dataset.tab;
+
+  // 更新标签页激活状态
+  tabBtns.forEach(btn => {
+    btn.classList.remove('active', 'text-primary', 'border-primary');
+    btn.classList.add('text-neutral', 'border-transparent');
+  });
+  e.target.classList.add('active', 'text-primary', 'border-primary');
+
+  // 渲染对应标签页的数据
+  renderData(tabType);
+}
+
+// 更新数据统计
+function updateCountStats() {
+  const bilibiliLen = crawlData.filter(item => item.platform === 'bilibili').length;
+  const zhihuLen = crawlData.filter(item => item.platform === 'zhihu').length;
+  const doubaoLen = crawlData.filter(item => item.platform === 'doubao').length;
+  const totalLen = crawlData.length;
+
+  totalCount.textContent = totalLen;
+  allCount.textContent = totalLen;
+  bilibiliCount.textContent = bilibiliLen;
+  zhihuCount.textContent = zhihuLen;
+  doubaoCount.textContent = doubaoLen;
+}
+
+// 打开详情弹窗
+function openDetailModal(item) {
+  modalTitle.textContent = item.标题;
+
+  // 平台名称映射
+  const platformName = {
+    bilibili: 'B站专栏',
+    zhihu: '知乎问答',
+    doubao: '豆包数据'
+  };
+  modalSource.textContent = platformName[item.platform];
+  modalRelevance.textContent = `相关性 ${item.relevance.toFixed(2)}`;
+  modalContent.textContent = item['介绍：'] || '暂无详细内容';
+  modalLink.href = item.链接;
+
+  detailModal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden'; // 禁止背景滚动
+}
+
+// 关闭详情弹窗
+function closeDetailModal() {
+  detailModal.classList.add('hidden');
+  document.body.style.overflow = ''; // 恢复背景滚动
+}
+
+// 导出JSON数据
+function exportDataAsJson() {
+  if (crawlData.length === 0) {
+    alert('暂无数据可导出');
+    return;
+  }
+
+  const jsonStr = JSON.stringify(crawlData, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `爬虫数据_${new Date().getTime()}.json`;
+  a.click();
+  URL.revokeObjectURL(url); // 释放URL对象
+}
+
+// 清空所有数据
+function clearAllData() {
+  if (confirm('确定要清空所有爬取数据吗？')) {
+    crawlData = [];
+    dataGrid.innerHTML = '';
+    updateCountStats();
+    emptyState.classList.remove('hidden');
+  }
+}
+
+// 切换主题（此处仅做UI切换，未实现真实暗黑模式）
+function toggleTheme() {
+  const icon = themeToggle.querySelector('i');
+  if (icon.classList.contains('fa-moon-o')) {
+    icon.classList.replace('fa-moon-o', 'fa-sun-o');
+    document.body.classList.add('dark-mode');
+    // 如需实现暗黑模式，可在此处添加样式切换逻辑
+  } else {
+    icon.classList.replace('fa-sun-o', 'fa-moon-o');
+    document.body.classList.remove('dark-mode');
+  }
+}
+  </script>
